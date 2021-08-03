@@ -42,7 +42,32 @@ app.get('/dribble', (req, res) => {
         .catch((err) => console.error(err))
 })
 
-app.post('/dribble', (req, res) => {
+//Verify that the user is logged in
+const FBAuth = (req, res, next) => {
+    let idToken
+    if(req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
+        idToken = req.headers.authorization.split('Bearer ')[1];
+    } else {
+        console.error("No token found")
+        return res.status(403).json({ error: "Unauthorized" })
+    }
+    
+    admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            req.user = decodedToken;
+            console.log(decodedToken);
+            return db.collection('users')
+                .where('userId', "==", req.user.uid)
+                .limit(1)
+                .get();
+        })
+        .then(data => {
+            req.user.handle = data.docs[0].data().handle;
+            return next();
+        })
+}
+
+app.post('/dribble', FBAuth, (req, res) => {
     if(req.method !== "POST"){
         return res.status(400).json({error: "Method not allowed"})
     }
